@@ -2,30 +2,24 @@ import java.net.*;
 import java.util.List;
 import java.util.Scanner;
 import java.io.*;
-
 abstract class PortScanner {
     protected InetAddress inetaddress;
     protected int startport;
     protected int endport;
-
     public PortScanner(String host, int startport, int endport) throws UnknownHostException {
         this.inetaddress = InetAddress.getByName(host);
         this.startport = startport;
         this.endport = endport;
     }
-
     public abstract void scanPorts();
-
     protected void printScanDetails() {
         System.out.println("(+)" + "scanner port on host " + inetaddress.getHostAddress());
     }
 }
-
 class TcpPortScanner extends PortScanner {
     public TcpPortScanner(String host, int startport, int endport) throws UnknownHostException {
         super(host, startport, endport);
     }
-
     public void scanPorts() {
         printScanDetails();
         for (int port = startport; port <= endport; port++) {
@@ -37,7 +31,6 @@ class TcpPortScanner extends PortScanner {
             }
         }
     }
-
     private void grabServiceBanner(Socket socket, int port) {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -50,12 +43,10 @@ class TcpPortScanner extends PortScanner {
         }
     }
 }
-
 class UdpPortScanner extends PortScanner {
     public UdpPortScanner(String host, int startport, int endport) throws UnknownHostException {
         super(host, startport, endport);
     }
-
     public void scanPorts() {
         printScanDetails();
         for (int port = startport; port <= endport; port++) {
@@ -73,75 +64,90 @@ class UdpPortScanner extends PortScanner {
         }
     }
 }
-
 class IcmpPinger {
     public static void pingHost(String host) {
         try {
-            ProcessBuilder builder = new ProcessBuilder(List.of("ping", "-c", "1", host));
-            Process process = builder.start();
-            BufferedReader inputstream = new BufferedReader(new InputStreamReader(process.getInputStream()));
-
+            // Determine the correct ping command based on the OS
+            String[] pingCommand;
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                pingCommand = new String[] { "ping", "-n", "1", host }; // Windows command
+            } else {
+                pingCommand = new String[] { "ping", "-c", "1", host }; // Linux/MacOS command
+            }
+            // Create a ProcessBuilder with the command
+            ProcessBuilder builder = new ProcessBuilder(pingCommand);
+            // Start the process
+            Process p = builder.start();
+            // Capture the standard output
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String s;
-            while ((s = inputstream.readLine()) != null) {
+            System.out.println("Ping Output:");
+            while ((s = inputStream.readLine()) != null) {
                 System.out.println(s);
             }
-
-            process.waitFor();
-        } catch (Exception e) {
-            e.printStackTrace();
+            // Wait for the process to complete
+            int exitCode = p.waitFor();
+            if (exitCode == 0) {
+                System.out.println("Ping successful!");
+            } else {
+                System.out.println("Ping failed with exit code: " + exitCode);
+            }
+        } catch (IOException | InterruptedException e) {
+            System.out.println("Error executing ping command: " + e.getMessage());
         }
     }
-
     public static String OsVersion(String host) {
         try {
+            // Create the process to run Nmap
             ProcessBuilder builder = new ProcessBuilder("nmap", "-O", host);
-            builder.redirectErrorStream(true);
+            builder.redirectErrorStream(true);  // Combine standard output and error stream
+            // Start the process
             Process process = builder.start();
-
-            BufferedReader inputstream = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String osinfo = null;
-            String line;
-
-            while ((line = inputstream.readLine()) != null) {
-                if (line.contains("Running:")) {
-                    osinfo = line;
-                    break;
+            // Use try-with-resources to automatically close the BufferedReader
+            try (BufferedReader inputStream = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String osInfo = null;
+                String line;
+                // Read the output from Nmap
+                while ((line = inputStream.readLine()) != null) {
+                    if (line.contains("Running:")) {
+                        osInfo = line;  // Capture the line containing OS information
+                        break;
+                    }
                 }
+                process.waitFor();  // Wait for the Nmap process to finish
+                return osInfo;  // Return the detected OS information
+            } catch (IOException e) {
+                System.out.println("Error reading Nmap output: " + e.getMessage());
+                return null;
             }
-
-            process.waitFor();
-            return osinfo;
-
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
             return null;
         }
     }
 }
-
 public class AdvancePortScanner {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-
         try {
             System.out.print("(+)" + "Enter Target Host(IP or DOMAIN NAME): ");
             String targetHost = scanner.nextLine();
-
             System.out.print("(+)" + "Enter start port: ");
             int startport = scanner.nextInt();
-
             System.out.print("(+)" + "Enter end port: ");
             int endport = scanner.nextInt();
-
             System.out.println("(+)" + "pinging host...");
             IcmpPinger.pingHost(targetHost);
-
+            System.out.println("(+)" + "Detecting OS using Nmap...");
             String osv = IcmpPinger.OsVersion(targetHost);
-            System.out.println("(+)" + "Detected OS: " + (osv != null ? osv : "Unknown"));
-
+            // Print the detected OS, or "Unknown" if not detected
+            if (osv != null) {
+                System.out.println("(+)" + "Detected OS: " + osv);
+            } else {
+                System.out.println("(+)" + "OS detection failed or returned no result.");
+            }
             System.out.print("(+)" + "Choose scan type (1 for TCP, 2 for UDP): ");
             int choice = scanner.nextInt();
-
             PortScanner ps;
             if (choice == 1) {
                 ps = new TcpPortScanner(targetHost, startport, endport);
@@ -152,7 +158,6 @@ public class AdvancePortScanner {
                 return;
             }
             ps.scanPorts();
-
         } catch (UnknownHostException ue) {
             System.out.println("Host could not be resolved: " + ue.getMessage());
         }
