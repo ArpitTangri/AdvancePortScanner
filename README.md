@@ -3,10 +3,12 @@
 A mini-Nmap style port scanner written in **Java**.  
 
 ##  Features
-- ✅ TCP connect scanning with timeout handling  
-- ✅ Basic UDP scanning with packet send/receive  
-- ✅ Simple service banner grabbing (HTTP, FTP, SSH, SMTP)  
-- ✅ Object-Oriented Design using abstract classes  
+ *  - TCP connect scanning
+ *  - UDP scanning (basic)
+ *  - Service banner grabbing (HTTP, FTP, SSH, SMTP)
+ *  - OS detection (basic RTT method)
+ *  - Threaded scanning for speed
+ *  - Results logged to file
 
 ##  Usage
 ```bash
